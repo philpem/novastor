@@ -1,0 +1,29 @@
+:PROC NOVAST
+	Read NOVASTOR backup sets
+	
+	Reads old NOVASTOR backup sets (Which NOVASTOR itself cannot do!).
+	The files are extracted into a directory structure.
+
+	This is an Edit phase module.
+:AUTHOR
+	Igor B. Morozov, 12/98.
+:INDEX
+	Novastor
+:STATUS
+	Reads NOVASTOR backup sets
+
+:GLOBAL
+FNAME,file88,,,,'Backup file name'
+
+:LIST	ASSIGN
+	Defines substitution of the drive name used in the NovaBack
+	file names.  See EXAMPLE 1.
+
+:LOCAL
+NAME,C8,,,,'Identifier of the drive name'
+SUBST,C80,,,,'Substitution string for the identifier: UNIX directory' 
+
+:USES	define
+
+:INCL	../GROUPS/applications.inc
+:END

@@ -1,0 +1,3 @@
+[submodule "lzs-compression"]
+	path = lzs-compression
+	url = https://github.com/cmcqueen/lzs-compression.git

@@ -82,7 +82,7 @@ int main(void)
 	char buf[40];
 
 	// open backup file
-	FILE *fp = fopen("../tape1.dmp", "rb");
+	FILE *fp = fopen("file000001.dd", "rb");
 	assert(fp != NULL);
 
 	// read backup set header
@@ -136,11 +136,13 @@ int main(void)
 
 	int nblks = 0;
 
-#define CBUFSZ 32768
-#define DBUFSZ 1048576
-	uint8_t *rbuf = malloc(CBUFSZ);
-	uint8_t *dbuf = malloc(DBUFSZ);
-	assert(buf != NULL);
+	size_t curRbufSz = 1024;
+	uint8_t *rbuf = malloc(curRbufSz);
+	assert(rbuf != NULL);
+
+	size_t curDbufSz = 1048576;
+	uint8_t *dbuf = malloc(curDbufSz);
+	assert(dbuf != NULL);
 
 	FILE *fo = fopen("decompressed.bin", "wb");
 	assert(fo != NULL);
@@ -157,6 +159,17 @@ int main(void)
 		nblks++;
 		//printf("BUFHDR  o=%-5lu  len=%u\n", bufHdr.current_offset, bufHdr.data_len);
 
+		// embiggen rbuf if it's too small
+		if (curRbufSz < bufHdr.data_len) {
+			// enlarge to next largest power of two
+			while (bufHdr.data_len > curRbufSz) {
+				curRbufSz *= 2;
+			}
+			//printf("  Read buffer too small, enlarging to %lu...\n", curRbufSz);
+			rbuf = realloc(rbuf, curRbufSz);
+			assert(rbuf != NULL);
+		}
+
 		// read compressed data
 		if (fread(rbuf, 1, bufHdr.data_len, fp) != bufHdr.data_len) {
 			printf("Read too few bytes while reading compressed data\n");
@@ -164,12 +177,26 @@ int main(void)
 		}
 
 		// LZS decompress
-		decompParms.inPtr = rbuf;
-		decompParms.inLength = bufHdr.data_len;
-		decompParms.outPtr = dbuf;
-		decompParms.outLength = DBUFSZ;
-		size_t decompSz = lzs_decompress_incremental(&decompParms);
-		//printf("  LZS: %u bytes written, status %d\n", decompSz, decompParms.status);
+		size_t decompSz;
+		while (true) {
+			decompParms.inPtr = rbuf;
+			decompParms.inLength = bufHdr.data_len;
+			decompParms.outPtr = dbuf;
+			decompParms.outLength = curDbufSz;
+			decompSz = lzs_decompress_incremental(&decompParms);
+
+			// check if we ran out of space
+			if (decompParms.status == LZS_C_STATUS_NO_OUTPUT_BUFFER_SPACE) {
+				curDbufSz *= 2;
+				printf("  Decompression buffer too small, enlarging to %lu and retrying...\n", curDbufSz);
+				dbuf = realloc(dbuf, curDbufSz);
+				assert(dbuf != NULL);
+				continue;
+			}
+
+			//printf("  LZS: %lu bytes written, status %d\n", decompSz, decompParms.status);
+			break;
+		}
 
 		// Normally we'd have to deal with leftover data in the input buffer. Because of how NovaStor works, that's not
 		// the case. NS compresses data into a 32KiB write buffer. When this buffer fills, it deletes any incomplete

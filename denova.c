@@ -148,76 +148,96 @@ int main(void)
 	FILE *fo = stdout;
 	assert(fo != NULL);
 
-	LzsDecompressParameters_t decompParms;
-	lzs_decompress_init(&decompParms);
+	if (bHdr.compress_type == 0) {
+		// Uncompressed data
+		//
+		// Note that uncompressed data doesn't contain any BUFHEADERs.
 
-	while (!feof(fp)) {
-		if (fread(&bufHdr, sizeof(bufHdr), 1, fp) < 1) {
-			fprintf(stderr, "Reached EOF\n%d blocks processed.\n", nblks);
-			break;
-		}
-
-		nblks++;
-		//printf("BUFHDR  o=%-5lu  len=%u\n", bufHdr.current_offset, bufHdr.data_len);
-
-		// embiggen rbuf if it's too small
-		if (curRbufSz < bufHdr.data_len) {
-			// enlarge to next largest power of two
-			while (bufHdr.data_len > curRbufSz) {
-				curRbufSz *= 2;
+		while (!feof(fp)) {
+			// Read as much as possible, drop it straight into the output file.
+			// Repeat until EOF.
+			size_t n = fread(dbuf, 1, curDbufSz, fp);
+			if (n > 0) {
+				assert(fwrite(dbuf, 1, n, fo) == n);
 			}
-			//printf("  Read buffer too small, enlarging to %lu...\n", curRbufSz);
-			rbuf = realloc(rbuf, curRbufSz);
-			assert(rbuf != NULL);
 		}
 
-		// read compressed data
-		if (fread(rbuf, 1, bufHdr.data_len, fp) != bufHdr.data_len) {
-			fprintf(stderr, "Read too few bytes while reading compressed data\n");
-			break;
-		}
+	} else if (bHdr.compress_type == 2) {
+		// LZS (Lempel Ziv Stac) compression
 
-		// LZS decompress
-		size_t decompSz;
-		while (true) {
-			decompParms.inPtr = rbuf;
-			decompParms.inLength = bufHdr.data_len;
-			decompParms.outPtr = dbuf;
-			decompParms.outLength = curDbufSz;
-			decompSz = lzs_decompress_incremental(&decompParms);
+		LzsDecompressParameters_t decompParms;
+		lzs_decompress_init(&decompParms);
 
-			// check if we ran out of space
-			if (decompParms.status == LZS_C_STATUS_NO_OUTPUT_BUFFER_SPACE) {
-				curDbufSz *= 2;
-				fprintf(stderr, "  Decompression buffer too small, enlarging to %lu and retrying...\n", curDbufSz);
-				dbuf = realloc(dbuf, curDbufSz);
-				assert(dbuf != NULL);
-				continue;
+		while (!feof(fp)) {
+			if (fread(&bufHdr, sizeof(bufHdr), 1, fp) < 1) {
+				fprintf(stderr, "Reached EOF\n%d blocks processed.\n", nblks);
+				break;
 			}
 
-			//printf("  LZS: %lu bytes written, status %d\n", decompSz, decompParms.status);
-			break;
+			nblks++;
+			//printf("BUFHDR  o=%-5lu  len=%u\n", bufHdr.current_offset, bufHdr.data_len);
+
+			// embiggen rbuf if it's too small
+			if (curRbufSz < bufHdr.data_len) {
+				// enlarge to next largest power of two
+				while (bufHdr.data_len > curRbufSz) {
+					curRbufSz *= 2;
+				}
+				//printf("  Read buffer too small, enlarging to %lu...\n", curRbufSz);
+				rbuf = realloc(rbuf, curRbufSz);
+				assert(rbuf != NULL);
+			}
+
+			// read compressed data
+			if (fread(rbuf, 1, bufHdr.data_len, fp) != bufHdr.data_len) {
+				fprintf(stderr, "Read too few bytes while reading compressed data\n");
+				break;
+			}
+
+			// LZS decompress
+			size_t decompSz;
+			while (true) {
+				decompParms.inPtr = rbuf;
+				decompParms.inLength = bufHdr.data_len;
+				decompParms.outPtr = dbuf;
+				decompParms.outLength = curDbufSz;
+				decompSz = lzs_decompress_incremental(&decompParms);
+
+				// check if we ran out of space
+				if (decompParms.status == LZS_C_STATUS_NO_OUTPUT_BUFFER_SPACE) {
+					curDbufSz *= 2;
+					fprintf(stderr, "  Decompression buffer too small, enlarging to %lu and retrying...\n", curDbufSz);
+					dbuf = realloc(dbuf, curDbufSz);
+					assert(dbuf != NULL);
+					continue;
+				}
+
+				//printf("  LZS: %lu bytes written, status %d\n", decompSz, decompParms.status);
+				break;
+			}
+
+			// Normally we'd have to deal with leftover data in the input buffer. Because of how NovaStor works, that's not
+			// the case. NS compresses data into a 32KiB write buffer. When this buffer fills, it deletes any incomplete
+			// blocks and writes an EOF marker.
+			// This primarily means that if there's a tape dropout, NS can recover by seeking ahead to the next 32K block.
+			// What it means for us is, we don't have to deal with blocks straddling multiple reads.
+			assert(decompParms.inLength == 0);
+
+			// dump the decompressed data in the output file
+			fwrite(dbuf, 1, decompSz, fo);
+
+			// Tape drive can only write a multiple of the block size, which means
+			// there will be padding we need to skip. Skip them.
+			uint32_t paddingBytes = (BLKSZ - ((bufHdr.data_len + sizeof(bufHdr)) % BLKSZ));
+			if (paddingBytes == BLKSZ) {
+				paddingBytes = 0;
+			}
+			fseek(fp, paddingBytes, SEEK_CUR);
 		}
-
-		// Normally we'd have to deal with leftover data in the input buffer. Because of how NovaStor works, that's not
-		// the case. NS compresses data into a 32KiB write buffer. When this buffer fills, it deletes any incomplete
-		// blocks and writes an EOF marker.
-		// This primarily means that if there's a tape dropout, NS can recover by seeking ahead to the next 32K block.
-		// What it means for us is, we don't have to deal with blocks straddling multiple reads.
-		assert(decompParms.inLength == 0);
-
-		// dump the decompressed data in the output file
-		fwrite(dbuf, 1, decompSz, fo);
-
-		// Tape drive can only write a multiple of the block size, which means
-		// there will be padding we need to skip. Skip them.
-		uint32_t paddingBytes = (BLKSZ - ((bufHdr.data_len + sizeof(bufHdr)) % BLKSZ));
-		if (paddingBytes == BLKSZ) {
-			paddingBytes = 0;
-		}
-
-		fseek(fp, paddingBytes, SEEK_CUR);
+	} else {
+		fprintf(stderr, "ERROR: Unknown compression type %d\n", bHdr.compress_type);
 	}
+
 
 	free(rbuf);
 	free(dbuf);

@@ -4,9 +4,9 @@ CFLAGS += -Ilzs-compression/c/src/liblzs
 
 all: denova denovafile
 
-denova:	denova.o lzs-compression/c/src/liblzs/lzs-compression.o lzs-compression/c/src/liblzs/lzs-decompression.o
+denova:	denova.o utils.o lzs-compression/c/src/liblzs/lzs-compression.o lzs-compression/c/src/liblzs/lzs-decompression.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-denovafile:	denovafile.c
+denovafile:	denovafile.o utils.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 

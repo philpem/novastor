@@ -8,6 +8,8 @@
 #include <sys/stat.h>
 #include <errno.h>
 
+#include "utils.h"
+
 #pragma pack(push,1)
 
 typedef struct {		/* Header written to tape for each file */
@@ -121,9 +123,12 @@ int main(int argc, char **argv)
 		// create directorie
 		mkpath(filename, S_IRWXU);
 
-		fprintf(stderr, "%s -- %u bytes\n", filename, hdr.fsize);
-		//fprintf(stderr, "  hsz %zu\n", hsz);
-		//fprintf(stderr, "  attr %02X %02X\n", hdr.eattrib, hdr.fattrib);
+		fprintf(stderr, "%s -- %u bytes -- created ", filename, hdr.fsize);
+		printdosdate(hdr.crdate, hdr.crtime);
+		fprintf(stderr, " -- modified ");
+		printdosdate(hdr.fdate, hdr.ftime);
+		fprintf(stderr, " -- attributes %02X\n", hdr.fattrib);
+		fprintf(stderr, "\n");
 
 		if (hdr.fattrib & ATTR_SUBDIRECTORY) {
 			//fprintf(stderr, "   Subdirectory\n");
@@ -133,8 +138,8 @@ int main(int argc, char **argv)
 			hdr.fsize = 0;
 		} else {
 			//fprintf(stderr, "   File\n");
-			fprintf(stderr, "   File size: %u\n", hdr.fsize);
-			fprintf(stderr, "   EA   size: %u\n", hdr.ealength);
+			//fprintf(stderr, "   File size: %u\n", hdr.fsize);
+			//fprintf(stderr, "   EA   size: %u\n", hdr.ealength);
 
 			// allocate memory if needed
 			if (hdr.fsize > bufsz) {

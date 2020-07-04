@@ -137,10 +137,12 @@ int main(int argc, char **argv)
 			}
 
 			// read file data and save to file
-			n = fread(buf, hdr.fsize, 1, stdin);
-			assert(n == 1);
 			FILE *fo = fopen(filename, "wb");
-			fwrite(buf, hdr.fsize, 1, fo);
+			if (hdr.fsize > 0) {
+				n = fread(buf, hdr.fsize, 1, stdin);
+				assert(n == 1);
+				fwrite(buf, hdr.fsize, 1, fo);
+			}
 			fclose(fo);
 		}
 

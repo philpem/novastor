@@ -128,6 +128,9 @@ int main(int argc, char **argv)
 		if (hdr.fattrib & ATTR_SUBDIRECTORY) {
 			//fprintf(stderr, "   Subdirectory\n");
 			//mkdir(filename, 0777);
+
+			// Sometimes NovaBack sets the filesize to 0xFFFFFFFF for subdirs. Bleh.
+			hdr.fsize = 0;
 		} else {
 			//fprintf(stderr, "   File\n");
 			fprintf(stderr, "   File size: %u\n", hdr.fsize);

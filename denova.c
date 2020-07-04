@@ -72,7 +72,7 @@ void printdosdate(const uint16_t date, const uint16_t time)
 	uint8_t mm = (ds >> 5) & 63;
 	uint8_t ss = ((ds) & 31) * 2;
 
-	printf("%04d-%02d-%02d %02d:%02d:%02d", y, m, d, hh, mm, ss);
+	fprintf(stderr, "%04d-%02d-%02d %02d:%02d:%02d", y, m, d, hh, mm, ss);
 }
 
 int main(void)
@@ -93,14 +93,14 @@ int main(void)
 		fprintf(stderr, "Not a NovaStor backup file.\n");
 		return -1;
 	} else {
-		printf("NovaStor backup file detected, version 0x%04X\n", bHdr.program_version);
+		fprintf(stderr, "NovaStor backup file detected, version 0x%04X\n", bHdr.program_version);
 	}
 
 	// print backup set header
-	printf("---- BACKUP SET HEADER ----\n");
-	printf("Index present:           %s\n", bHdr.index_present ? "Yes" : "No");
-	printf("Compression:             %d\n", bHdr.compress_type);
-	printf("EOV flags:               %s%s%s%s%s\n",
+	fprintf(stderr, "---- BACKUP SET HEADER ----\n");
+	fprintf(stderr, "Index present:           %s\n", bHdr.index_present ? "Yes" : "No");
+	fprintf(stderr, "Compression:             %d\n", bHdr.compress_type);
+	fprintf(stderr, "EOV flags:               %s%s%s%s%s\n",
 		bHdr.eovflags & EOVFLAGS_XXXXXX           ? "IX_QIC " : "",
 		bHdr.eovflags & EOVFLAGS_UTC_TIMES        ? "UTC_TIMES " : "",
 		bHdr.eovflags & EOVFLAGS_ANSI_FIELDS      ? "ANSI_FIELDS " : "",
@@ -108,31 +108,31 @@ int main(void)
 		bHdr.eovflags & EOVFLAGS_ENCRYPTED        ? "ENCRYPTED " : ""
 		);
 	
-	printf("File   date/time:        ");
+	fprintf(stderr, "File   date/time:        ");
 	printdosdate(bHdr.fdate, bHdr.ftime);
-	printf("\n");
+	fprintf(stderr, "\n");
 
-	printf("Backup date/time:        ");
+	fprintf(stderr, "Backup date/time:        ");
 	printdosdate(bHdr.bkdate, bHdr.bktime);
-	printf("\n");
+	fprintf(stderr, "\n");
 
-	printf("Volume sequence number:  %d\n", bHdr.volseq);
-	printf("Password hash:           0x%02X\n", bHdr.password);
-	printf("Program version:         %d\n", bHdr.program_version);
+	fprintf(stderr, "Volume sequence number:  %d\n", bHdr.volseq);
+	fprintf(stderr, "Password hash:           0x%02X\n", bHdr.password);
+	fprintf(stderr, "Program version:         %d\n", bHdr.program_version);
 
 	memcpy(buf, bHdr.eovlit, sizeof(bHdr.eovlit));
 	buf[sizeof(bHdr.eovlit)] = '\0';
-	printf("Header signature:        %s\n", buf);
+	fprintf(stderr, "Header signature:        %s\n", buf);
 
 	memcpy(buf, bHdr.fdesc, sizeof(bHdr.fdesc));
 	buf[sizeof(bHdr.fdesc)] = '\0';
-	printf("Backup set description:  [%s]\n", buf);
+	fprintf(stderr, "Backup set description:  [%s]\n", buf);
 
 	memcpy(buf, bHdr.tdesc, sizeof(bHdr.tdesc));
 	buf[sizeof(bHdr.tdesc)] = '\0';
-	printf("Tape volume description: [%s]\n", buf);
+	fprintf(stderr, "Tape volume description: [%s]\n", buf);
 
-	printf("\n\n");
+	fprintf(stderr, "\n\n");
 
 	int nblks = 0;
 
@@ -144,7 +144,8 @@ int main(void)
 	uint8_t *dbuf = malloc(curDbufSz);
 	assert(dbuf != NULL);
 
-	FILE *fo = fopen("decompressed.bin", "wb");
+	//FILE *fo = fopen("decompressed.bin", "wb");
+	FILE *fo = stdout;
 	assert(fo != NULL);
 
 	LzsDecompressParameters_t decompParms;
@@ -152,7 +153,7 @@ int main(void)
 
 	while (!feof(fp)) {
 		if (fread(&bufHdr, sizeof(bufHdr), 1, fp) < 1) {
-			printf("Reached EOF\n%d blocks processed.\n", nblks);
+			fprintf(stderr, "Reached EOF\n%d blocks processed.\n", nblks);
 			break;
 		}
 
@@ -172,7 +173,7 @@ int main(void)
 
 		// read compressed data
 		if (fread(rbuf, 1, bufHdr.data_len, fp) != bufHdr.data_len) {
-			printf("Read too few bytes while reading compressed data\n");
+			fprintf(stderr, "Read too few bytes while reading compressed data\n");
 			break;
 		}
 
@@ -188,7 +189,7 @@ int main(void)
 			// check if we ran out of space
 			if (decompParms.status == LZS_C_STATUS_NO_OUTPUT_BUFFER_SPACE) {
 				curDbufSz *= 2;
-				printf("  Decompression buffer too small, enlarging to %lu and retrying...\n", curDbufSz);
+				fprintf(stderr, "  Decompression buffer too small, enlarging to %lu and retrying...\n", curDbufSz);
 				dbuf = realloc(dbuf, curDbufSz);
 				assert(dbuf != NULL);
 				continue;

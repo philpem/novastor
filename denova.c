@@ -212,6 +212,10 @@ int main(void)
 		// Tape drive can only write a multiple of the block size, which means
 		// there will be padding we need to skip. Skip them.
 		uint32_t paddingBytes = (BLKSZ - ((bufHdr.data_len + sizeof(bufHdr)) % BLKSZ));
+		if (paddingBytes == BLKSZ) {
+			paddingBytes = 0;
+		}
+
 		fseek(fp, paddingBytes, SEEK_CUR);
 	}
 

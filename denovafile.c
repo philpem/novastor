@@ -36,7 +36,7 @@ typedef struct {		/* Header written to tape for each file */
 #define FHDR_MAGIC "<<NoVaStOr>>"
 
 #define BSZ 1024
-#define BLKPADSZ(x) (BSZ - ((x) % BSZ))
+#define BLKPADSZ(x) (((x)%BSZ) ? (BSZ - ((x) % BSZ)) : 0)
 
 
 // DOS file attribute bits -- from https://dos4gw.org/File_Attribute
@@ -145,7 +145,9 @@ int main(int argc, char **argv)
 		}
 
 		// Skip padding to get to next header
-		n = fread(buf, BLKPADSZ(hdr.fsize + hsz), 1, stdin);
-		assert(n == 1);
+		if (BLKPADSZ(hdr.fsize + hsz) != 0) {
+			n = fread(buf, BLKPADSZ(hdr.fsize + hsz), 1, stdin);
+			assert(n == 1);
+		}
 	}
 }

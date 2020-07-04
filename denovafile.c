@@ -127,7 +127,7 @@ int main(int argc, char **argv)
 		printdosdate(hdr.crdate, hdr.crtime);
 		fprintf(stderr, " -- modified ");
 		printdosdate(hdr.fdate, hdr.ftime);
-		fprintf(stderr, " -- attributes %02X\n", hdr.fattrib);
+		fprintf(stderr, " -- attributes %02X", hdr.fattrib);
 		fprintf(stderr, "\n");
 
 		if (hdr.fattrib & ATTR_SUBDIRECTORY) {

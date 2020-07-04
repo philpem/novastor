@@ -35,8 +35,7 @@ typedef struct {		/* Header written to tape for each file */
 
 #define FHDR_MAGIC "<<NoVaStOr>>"
 
-#define BSZ 1024
-#define BLKPADSZ(x) (((x)%BSZ) ? (BSZ - ((x) % BSZ)) : 0)
+#define BLKSZ 1024
 
 
 // DOS file attribute bits -- from https://dos4gw.org/File_Attribute
@@ -87,11 +86,13 @@ int main(int argc, char **argv)
 	char		filename[256];
 	size_t		hsz;
 
+	FILE *fin = fopen("decomp.bin", "rb");
+
 	size_t bufsz = 1048576;
 	uint8_t *buf = malloc(bufsz);
 
 	while (true) {
-		size_t n = fread(&hdr, sizeof(hdr), 1, stdin);
+		size_t n = fread(&hdr, sizeof(hdr), 1, fin);
 		hsz = sizeof(hdr);
 
 		if (n != 1) {
@@ -101,13 +102,14 @@ int main(int argc, char **argv)
 
 		// check magic
 		if (memcmp(hdr.fid, FHDR_MAGIC, sizeof(hdr.fid)) != 0) {
-			fprintf(stderr, "denovafile: FID not correct\n");
-			break;
+			fprintf(stderr, "denovafile: FID not correct -- ofs = %lX -- trying to resync...\n", ftell(fin) - sizeof(hdr));
+			fseek(fin, -(sizeof(hdr)-1), SEEK_CUR);
+			continue;
 		}
 
 		// get filename -- may be a short or long one
 		if (hdr.fname[0] == 0xFF) {
-			assert(fread(&filename, sizeof(filename), 1, stdin) == 1);
+			assert(fread(&filename, sizeof(filename), 1, fin) == 1);
 			hsz += 256;
 		} else {
 			strncpy(filename, hdr.fname, sizeof(hdr.fname));
@@ -128,6 +130,8 @@ int main(int argc, char **argv)
 			//mkdir(filename, 0777);
 		} else {
 			//fprintf(stderr, "   File\n");
+			fprintf(stderr, "   File size: %u\n", hdr.fsize);
+			fprintf(stderr, "   EA   size: %u\n", hdr.ealength);
 
 			// allocate memory if needed
 			if (hdr.fsize > bufsz) {
@@ -139,7 +143,7 @@ int main(int argc, char **argv)
 			// read file data and save to file
 			FILE *fo = fopen(filename, "wb");
 			if (hdr.fsize > 0) {
-				n = fread(buf, hdr.fsize, 1, stdin);
+				n = fread(buf, hdr.fsize, 1, fin);
 				assert(n == 1);
 				fwrite(buf, hdr.fsize, 1, fo);
 			}
@@ -147,8 +151,14 @@ int main(int argc, char **argv)
 		}
 
 		// Skip padding to get to next header
-		if (BLKPADSZ(hdr.fsize + hsz) != 0) {
-			n = fread(buf, BLKPADSZ(hdr.fsize + hsz), 1, stdin);
+		uint32_t paddingBytes = (BLKSZ - ((hdr.fsize + hsz) % BLKSZ));
+		if (paddingBytes == BLKSZ) {
+			paddingBytes = 0;
+		}
+
+		//fprintf(stderr, "  padding: %u\n", paddingBytes);
+		if (paddingBytes > 0) {
+			n = fread(buf, paddingBytes, 1, fin);
 			assert(n == 1);
 		}
 	}

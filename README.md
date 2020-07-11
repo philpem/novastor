@@ -2,7 +2,7 @@
 
 Tools to decompress ancient NovaStor NovaBack / NovaBackup tape backups
 
-Tested with backups from NovaBack 4, other versions may work.
+Tested with backups from NovaBack 4. Backups from other versions may also work but are untested.
 
 If this helps you, please let me know: philpem@gmail.com
 

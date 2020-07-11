@@ -8,6 +8,8 @@ If this helps you, please let me know: philpem@gmail.com
 
 This project is not authorised, endorsed or related to Novastor or Novaback and has been created with entirely open-source materials. No warranty is given, express or implied.
 
+Based on portions of the IGeoS data analysis tool developed by the Seismology and Geophysics department at the University of Saskatchewan (http://seisweb.usask.ca/SIA/).
+
 
 ## How to use
 

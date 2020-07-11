@@ -60,14 +60,30 @@ typedef struct {
 
 
 
-int main(void)
+int main(int argc, char **argv)
 {
 	BACKUPSETHEADER bHdr;
 	BUFHEADER bufHdr;
 	char buf[40];
 
 	// open backup file
-	FILE *fp = fopen("file000001.dd", "rb");
+	FILE *fp;
+
+	// open input file
+	if (argc == 1) {
+		// no params
+		fprintf(stderr, "syntax: %s filename\n", argv[0]);
+		fprintf(stderr, "  filename may be - for STDIN\n");
+		return -1;
+	} else if (argc > 1) {
+		// filename "-" means STDIN
+		if (strcmp(argv[1], "-") == 0) {
+			fp = stdin;
+		} else {
+			fp = fopen(argv[1], "rb");
+		}
+	}
+
 	assert(fp != NULL);
 
 	// read backup set header

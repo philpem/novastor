@@ -88,7 +88,24 @@ int main(int argc, char **argv)
 	char		filename[256];
 	size_t		hsz;
 
-	FILE *fin = fopen("decomp.bin", "rb");
+	FILE *fin;
+
+	// open input file
+	if (argc == 1) {
+		// no params
+		fprintf(stderr, "syntax: %s filename\n", argv[0]);
+		fprintf(stderr, "  filename may be - for STDIN\n");
+		return -1;
+	} else if (argc > 1) {
+		// filename "-" means STDIN
+		if (strcmp(argv[1], "-") == 0) {
+			fin = stdin;
+		} else {
+			fin = fopen(argv[1], "rb");
+		}
+	}
+
+	assert(fin != NULL);
 
 	size_t bufsz = 1048576;
 	uint8_t *buf = malloc(bufsz);

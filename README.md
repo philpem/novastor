@@ -10,6 +10,8 @@ This project is not authorised, endorsed or related to Novastor or Novaback and 
 
 Based on portions of the IGeoS data analysis tool developed by the Seismology and Geophysics department at the University of Saskatchewan (http://seisweb.usask.ca/SIA/).
 
+LZS (Lempel-Ziv-Stac) data compression library developed by Craig McQueen (https://github.com/cmcqueen)
+
 
 ## How to use
 

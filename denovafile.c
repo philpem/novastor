@@ -93,20 +93,49 @@ int main(int argc, char **argv)
 	size_t bufsz = 1048576;
 	uint8_t *buf = malloc(bufsz);
 
+	uint8_t window[128];
+	assert(sizeof(window) == sizeof(TAPEHEAD));
+	bool syncing = false;
+	size_t syncpos;
+
+	// prefill the window
+	assert(fread(&window[1], 1,  sizeof(window)-1, fin) == sizeof(window)-1);
+	syncpos = sizeof(window);
+
 	while (true) {
-		size_t n = fread(&hdr, sizeof(hdr), 1, fin);
+		size_t n;
+
 		hsz = sizeof(hdr);
+
+		// shift window along and fill EOB
+		memmove(&window, &window[1], sizeof(window)-1);
+		n = fread(&window[sizeof(window)-1], 1, 1, fin);
+		syncpos++;
 
 		if (n != 1) {
 			fprintf(stderr, "denovafile: EOF\n");
 			break;
 		}
 
-		// check magic
-		if (memcmp(hdr.fid, FHDR_MAGIC, sizeof(hdr.fid)) != 0) {
-			fprintf(stderr, "denovafile: FID not correct -- ofs = %lX -- trying to resync...\n", ftell(fin) - sizeof(hdr));
-			fseek(fin, -(sizeof(hdr)-1), SEEK_CUR);
+		// don't try to sync if we haven't got a full header
+		if (syncpos < sizeof(window)) {
 			continue;
+		}
+
+		// copy sliding window into header buffer
+		memcpy(&hdr, &window, sizeof(hdr));
+
+		// check file header magic
+		if (memcmp(hdr.fid, FHDR_MAGIC, sizeof(hdr.fid)) != 0) {
+			// no match, set sync flag and keep going
+			syncing = true;
+			continue;
+		} else {
+			if (syncing) {
+				fprintf(stderr, "  FILEHEADER resync: sync found %lu bytes late\n", syncpos-sizeof(window));
+			}
+			syncpos = 0;
+			syncing = false;
 		}
 
 		// get filename -- may be a short or long one
